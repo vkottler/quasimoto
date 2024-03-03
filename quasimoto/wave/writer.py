@@ -6,7 +6,7 @@ A module implementing interfaces for writing WAVE files.
 from contextlib import contextmanager
 import os
 from pathlib import Path
-from typing import Iterable, Iterator
+from typing import BinaryIO, Iterable, Iterator
 
 # third-party
 from runtimepy.primitives import Int16
@@ -58,6 +58,21 @@ class WaveWriter(FormatMixin):
         # Write 'data' chunk header.
         ChunkType.DATA.to_stream(self.riff.stream)
 
+    @classmethod
+    def to_bytes(cls, value: int) -> bytes:
+        """Convert a sample value to bytes."""
+
+        # Note the underlying type assumption.
+        return Int16.kind.encode(value, byte_order=cls.byte_order)
+
+    @classmethod
+    def to_stream(cls, stream: BinaryIO, value: int) -> int:
+        """Write a value to a stream."""
+
+        data = cls.to_bytes(value)
+        stream.write(data)
+        return len(data)
+
     def write(self, samples: Iterable[tuple[int, ...]]) -> None:
         """Write samples to the output."""
 
@@ -72,10 +87,7 @@ class WaveWriter(FormatMixin):
             size = 0
             for sample in samples:
                 for point in sample:
-                    Int16.kind.write(
-                        point, self.riff.stream, byte_order=self.byte_order
-                    )
-                    size += 2
+                    size += self.to_stream(self.riff.stream, point)
 
             self.riff.write_size(size, seek=size_pos)
 

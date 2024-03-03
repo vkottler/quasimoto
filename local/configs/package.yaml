@@ -19,3 +19,6 @@ commands:
 mypy_local: |
   [mypy-scipy.*]
   ignore_missing_imports = True
+
+  [mypy-pyaudio.*]
+  ignore_missing_imports = True

@@ -8,6 +8,9 @@ from copy import copy
 import math
 from typing import TypeVar
 
+# third-party
+from runtimepy.primitives import Double
+
 # internal
 from quasimoto.wave.writer import DEFAULT_BITS, DEFAULT_SAMPLE_RATE
 
@@ -25,18 +28,21 @@ class Sampler(Iterable[int]):
         duration_s: float = None,
         frequency: float = DEFAULT_FREQUENCY,
         time: float = 0.0,
+        amplitude: float = 1.0,
     ) -> None:
         """Initialize this instance."""
 
         # Can be changed after initialization.
-        self.frequency = frequency
+        self.frequency = Double(value=frequency)
+        self.amplitude = Double(value=amplitude)
         self.duration_s = duration_s
+
+        # Runtime state.
+        self.time = time
 
         # Constants / final.
         self.sample_rate = sample_rate
         self.period = 1.0 / self.sample_rate
-        self.time = time
-
         # Note: this assumed signed + zero-centered.
         self.num_bits = num_bits
         self.scalar = (2 ** (self.num_bits - 1)) - 1
@@ -48,9 +54,13 @@ class Sampler(Iterable[int]):
             num_bits=self.num_bits,
             sample_rate=self.sample_rate,
             duration_s=self.duration_s,
-            frequency=self.frequency,
+            frequency=self.frequency.value,
             time=self.time,
         )
+
+    def harmonic(self, index: int) -> float:
+        """Get a harmonic frequency based on this instance's frequency."""
+        return float(2**index) * self.frequency.value
 
     def copy(self: T, harmonic: int = None, duration_s: float = None) -> T:
         """Get a copy of this instance."""
@@ -60,7 +70,7 @@ class Sampler(Iterable[int]):
         if duration_s is not None:
             result.duration_s = duration_s
         if harmonic is not None:
-            result.frequency = float(2**harmonic) * self.frequency
+            result.frequency.value = result.harmonic(harmonic)
 
         return result
 
@@ -78,7 +88,12 @@ class Sampler(Iterable[int]):
 
     def sin(self, now: float) -> int:
         """Get a raw sin value sample."""
-        return int(self.scalar * math.sin(math.tau * now * self.frequency))
+
+        return int(
+            self.scalar
+            * self.amplitude.value
+            * math.sin(math.tau * now * self.frequency.value)
+        )
 
     def value(self, now: float) -> int:
         """Get the next value."""
