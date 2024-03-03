@@ -1,0 +1,10 @@
+---
+name: quasimoto
+version: "{{major}}.{{minor}}.{{patch}}"
+description: A lossless audio generator.
+entry: {{entry}}
+requirements:
+  - vcorelib
+dev_requirements:
+  - setuptools-wrapper
+  - types-setuptools
