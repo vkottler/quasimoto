@@ -8,3 +8,7 @@ requirements:
 dev_requirements:
   - setuptools-wrapper
   - types-setuptools
+
+commands:
+  - name: gen
+    description: "generate audio"

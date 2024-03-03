@@ -2,7 +2,7 @@
     =====================================
     generator=datazen
     version=3.1.4
-    hash=1490ef1598c6d50a820b17c28baf06bf
+    hash=32f83dc4656170a9cfc0c52220eb0ead
     =====================================
 -->
 
@@ -29,10 +29,8 @@
 
 This package is tested with the following Python minor versions:
 
-* [`python3.8`](https://docs.python.org/3.8/)
-* [`python3.9`](https://docs.python.org/3.9/)
-* [`python3.10`](https://docs.python.org/3.10/)
 * [`python3.11`](https://docs.python.org/3.11/)
+* [`python3.12`](https://docs.python.org/3.12/)
 
 ## Platform Support
 
@@ -50,7 +48,7 @@ This package is tested on the following platforms:
 $ ./venv3.11/bin/quasimoto -h
 
 usage: quasimoto [-h] [--version] [-v] [-q] [--curses] [--no-uvloop] [-C DIR]
-                 {noop} ...
+                 {gen,noop} ...
 
 A lossless audio generator.
 
@@ -64,7 +62,8 @@ options:
   -C DIR, --dir DIR  execute from a specific directory
 
 commands:
-  {noop}             set of available commands
+  {gen,noop}         set of available commands
+    gen              generate audio
     noop             command stub (does nothing)
 
 ```
