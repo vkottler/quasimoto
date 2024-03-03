@@ -5,6 +5,9 @@ description: A lossless audio generator.
 entry: {{entry}}
 requirements:
   - vcorelib
+  - runtimepy
+  - scipy
+  - matplotlib
 dev_requirements:
   - setuptools-wrapper
   - types-setuptools
@@ -12,3 +15,7 @@ dev_requirements:
 commands:
   - name: gen
     description: "generate audio"
+
+mypy_local: |
+  [mypy-scipy.*]
+  ignore_missing_imports = True

@@ -1,1 +1,4 @@
 vcorelib
+runtimepy
+scipy
+matplotlib
