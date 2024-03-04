@@ -3,7 +3,9 @@ A module implementing developmental runtimepy interfaces.
 """
 
 # built-in
+import asyncio
 from contextlib import contextmanager
+import math
 from typing import Iterator
 
 # third-party
@@ -110,6 +112,21 @@ class Stereo(TaskFactory[StereoTask]):
 async def main(app: AppInfo) -> int:
     """Waits for the stop signal to be set."""
 
-    del app
+    stereo = list(app.search_tasks(kind=StereoTask))[0].stereo
+
+    freq = 0.5
+    loop = asyncio.get_running_loop()
+
+    # Alter the frequencies.
+    while not app.stop.is_set():
+        # Conform to 0-1 domain.
+        raw = (math.sin(math.tau * loop.time() * freq) + 1.0) / 2.0
+
+        # Re-assign
+        stereo.left.amplitude.value = raw
+        stereo.right.amplitude.value = 1 - raw
+
+        # Run periodically.
+        await asyncio.sleep(0.01)
 
     return 0
