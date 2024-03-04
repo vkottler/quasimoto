@@ -1,0 +1,10 @@
+---
+app:
+  - tasks.dev.main
+  - runtimepy.net.apps.wait_for_stop
+
+factories:
+  - {name: tasks.dev.Stereo}
+
+tasks:
+  - {name: stereo, factory: stereo, period_s: 0.02}

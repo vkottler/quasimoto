@@ -1,7 +1,7 @@
 # =====================================
 # generator=datazen
 # version=3.1.4
-# hash=8efc396041b8d6d582b53a5468ffda71
+# hash=9bcedc43070f45384f7b98092917a200
 # =====================================
 
 """
@@ -10,4 +10,4 @@ Useful defaults and other package metadata.
 
 DESCRIPTION = "A lossless audio generator."
 PKG_NAME = "quasimoto"
-VERSION = "0.2.0"
+VERSION = "0.2.1"

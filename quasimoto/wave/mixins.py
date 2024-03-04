@@ -7,7 +7,6 @@ from typing import cast
 
 # third-party
 from runtimepy.codec.protocol import Protocol
-from runtimepy.primitives.byte_order import ByteOrder
 from vcorelib.logging import LoggerMixin
 
 # internal
@@ -17,16 +16,13 @@ from quasimoto.wave.protocol import WaveFormat
 class FormatMixin(LoggerMixin):
     """A class mixin for classes that use wave format data."""
 
+    byte_order = WaveFormat.protocol.array.byte_order
+
     def __init__(self) -> None:
         """Initialize this instance."""
 
         super().__init__()
         self.format = WaveFormat.instance()
-
-    @property
-    def byte_order(self) -> ByteOrder:
-        """Get the byte order for this format."""
-        return self.format.array.byte_order
 
     @property
     def channels(self) -> int:
