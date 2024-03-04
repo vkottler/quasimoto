@@ -1,7 +1,6 @@
 ---
 app:
   - tasks.dev.main
-  - runtimepy.net.apps.wait_for_stop
 
 factories:
   - {name: tasks.dev.Stereo}
