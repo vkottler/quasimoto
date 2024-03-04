@@ -5,44 +5,46 @@ A module implementing sampler interfaces.
 # built-in
 from collections.abc import Iterable, Iterator
 from copy import copy
-import math
-from typing import TypeVar
+from pathlib import Path
+from typing import TypeVar, cast
 
 # third-party
-from runtimepy.primitives import Double
+import matplotlib.pyplot as plt
+from runtimepy.primitives import Double, create
 
 # internal
-from quasimoto.wave.writer import DEFAULT_BITS, DEFAULT_SAMPLE_RATE
+from quasimoto.enums.wave import WaveShape
+from quasimoto.sampler.frequency import DEFAULT_FREQUENCY, HasFrequencyMixin
+from quasimoto.sampler.time import TimeKeeper
+from quasimoto.wave.writer import DEFAULT_BITS
 
-DEFAULT_FREQUENCY = 261.63
 T = TypeVar("T", bound="Sampler")
 
 
-class Sampler(Iterable[int]):
+class Sampler(HasFrequencyMixin, Iterable[int]):
     """A base class for iterable sampler interfaces."""
 
     def __init__(
         self,
+        time_keeper: TimeKeeper,
         num_bits: int = DEFAULT_BITS,
-        sample_rate: int = DEFAULT_SAMPLE_RATE,
-        duration_s: float = None,
+        stop_time: float = None,
         frequency: float = DEFAULT_FREQUENCY,
-        time: float = 0.0,
         amplitude: float = 1.0,
+        shape: WaveShape | int = WaveShape.SINE,
     ) -> None:
         """Initialize this instance."""
 
+        self.time_keeper = time_keeper
+
         # Can be changed after initialization.
-        self.frequency = Double(value=frequency)
+        super().__init__(frequency=frequency)
         self.amplitude = Double(value=amplitude)
-        self.duration_s = duration_s
+        self.stop_time = stop_time
 
-        # Runtime state.
-        self.time = time
+        self.shape = create(WaveShape.primitive())
+        self.shape.value = shape
 
-        # Constants / final.
-        self.sample_rate = sample_rate
-        self.period = 1.0 / self.sample_rate
         # Note: this assumed signed + zero-centered.
         self.num_bits = num_bits
         self.scalar = (2 ** (self.num_bits - 1)) - 1
@@ -51,53 +53,35 @@ class Sampler(Iterable[int]):
         """Create a copy of this instance."""
 
         return type(self)(
+            self.time_keeper,
             num_bits=self.num_bits,
-            sample_rate=self.sample_rate,
-            duration_s=self.duration_s,
+            stop_time=self.stop_time,
             frequency=self.frequency.value,
-            time=self.time,
+            amplitude=self.amplitude.value,
+            shape=cast(int, self.shape.value),
         )
 
-    def harmonic(self, index: int) -> float:
-        """Get a harmonic frequency based on this instance's frequency."""
-        return float(2**index) * self.frequency.value
-
-    def copy(self: T, harmonic: int = None, duration_s: float = None) -> T:
+    def copy(self: T, harmonic: int = None, stop_time: float = None) -> T:
         """Get a copy of this instance."""
 
         result = copy(self)
 
-        if duration_s is not None:
-            result.duration_s = duration_s
+        if stop_time is not None:
+            result.stop_time = stop_time
         if harmonic is not None:
             result.frequency.value = result.harmonic(harmonic)
 
         return result
 
-    def advance(self, steps: int = 1) -> bool:
-        """Advance time forward."""
+    def value(self, now: float) -> int:
+        """Get the next value."""
 
-        result = True
-
-        for _ in range(steps):
-            self.time += self.period
-            if self.duration_s is not None:
-                result = self.time < self.duration_s
-
-        return result
-
-    def sin(self, now: float) -> int:
-        """Get a raw sin value sample."""
-
+        # Select underlying wave generator.
         return int(
             self.scalar
             * self.amplitude.value
-            * math.sin(math.tau * now * self.frequency.value)
+            * self.by_shape[self.shape.value](now)  # type: ignore
         )
-
-    def value(self, now: float) -> int:
-        """Get the next value."""
-        return self.sin(now)
 
     def __iter__(self) -> Iterator[int]:
         """Return an iterator."""
@@ -106,9 +90,27 @@ class Sampler(Iterable[int]):
     def __next__(self) -> int:
         """Get the next value from this sampler."""
 
-        val: int = self.value(self.time)
-
-        if not self.advance():
+        # Determine if we should stop.
+        if (
+            self.stop_time is not None
+            and self.time_keeper.time >= self.stop_time
+        ):
             raise StopIteration
 
-        return val
+        return self.value(self.time_keeper.time)
+
+    def plot(self, path: Path | str, duration_s: float) -> None:
+        """Create a ."""
+
+        # Copy self and our time keeper to create equivalent but independent
+        # results.
+        inst = self.copy()
+        inst.time_keeper = self.time_keeper.copy()
+
+        data = []
+        for _ in range(inst.time_keeper.num_samples(duration_s)):
+            data.append(next(inst))
+            inst.time_keeper.advance()
+
+        plt.plot(data)
+        plt.savefig(str(path), bbox_inches="tight")

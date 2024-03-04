@@ -15,4 +15,5 @@ coverage*.xml
 tags
 mklocal
 docs
-test.wav
+/test.wav
+/out.png

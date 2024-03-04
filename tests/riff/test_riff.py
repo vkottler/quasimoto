@@ -14,6 +14,7 @@ from vcorelib.paths.context import tempfile
 # module under test
 from quasimoto.riff import RiffInterface
 from quasimoto.sampler import Sampler
+from quasimoto.sampler.time import TimeKeeper
 from quasimoto.wave import WaveReader, WaveWriter
 
 # internal
@@ -41,7 +42,7 @@ def test_riff_reader_basic():
 
         num_samples = wave.num_samples
         plt.plot(
-            fftfreq(num_samples, wave.sample_period)[: (num_samples + 1) // 2],
+            fftfreq(num_samples, wave.sample_period)[: len(left_fft)],
             left_fft,
         )
 
@@ -55,19 +56,20 @@ def test_writing_test_wav():
     """Write the 'test.wav' output."""
 
     with WaveWriter.from_path(Path("test.wav")) as writer:
-        duration_s = 4.0
-        base = Sampler(duration_s=duration_s)
+        stop_time = 4.0
+        time = TimeKeeper()
+        base = Sampler(time, stop_time=stop_time)
         assert iter(base)
 
         samplers = set(
             [
-                base.copy(3, duration_s=duration_s / 8.0),
-                base.copy(2, duration_s=duration_s / 4.0),
-                base.copy(1, duration_s=duration_s / 2.0),
+                base.copy(3, stop_time=stop_time / 8.0),
+                base.copy(2, stop_time=stop_time / 4.0),
+                base.copy(1, stop_time=stop_time / 2.0),
                 base,
-                base.copy(-1, duration_s=duration_s / 2.0),
-                base.copy(-2, duration_s=duration_s / 4.0),
-                base.copy(-3, duration_s=duration_s / 8.0),
+                base.copy(-1, stop_time=stop_time / 2.0),
+                base.copy(-2, stop_time=stop_time / 4.0),
+                base.copy(-3, stop_time=stop_time / 8.0),
             ]
         )
 
@@ -87,6 +89,9 @@ def test_writing_test_wav():
             for sampler in to_remove:
                 samplers.remove(sampler)
 
+            # Advance time.
+            time.advance()
+
             if parts:
                 val = int(sum(parts) / len(parts))
                 samples.append((val, val))
@@ -99,9 +104,7 @@ def test_writing_test_wav():
 
         num_samples = len(single_chan)
         plt.plot(
-            fftfreq(num_samples, writer.sample_period)[
-                : (num_samples + 1) // 2
-            ],
+            fftfreq(num_samples, writer.sample_period)[: len(chan_fft)],
             chan_fft,
         )
 
