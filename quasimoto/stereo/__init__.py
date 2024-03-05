@@ -1,8 +1,9 @@
 """
-A module implementing some stereo-audio interfaces.
+A module implementing a simple stereo signal interface.
 """
 
 # built-in
+from copy import copy
 from io import BytesIO
 from queue import SimpleQueue
 
@@ -10,7 +11,8 @@ from queue import SimpleQueue
 import pyaudio
 
 # internal
-from quasimoto.sampler import Sampler, TimeKeeper
+from quasimoto.sampler.channel import SignalChannel
+from quasimoto.sampler.time import TimeKeeper
 from quasimoto.wave import WaveWriter
 
 
@@ -23,9 +25,8 @@ class StereoInterface:
         """Initialize this instance."""
 
         self.time = TimeKeeper()
-
-        self.left = Sampler(self.time)
-        self.right = self.left.copy(harmonic=-1)
+        self.left = SignalChannel(self.time)
+        self.right = copy(self.left)
 
         self.sample_queue: SimpleQueue[tuple[int, int]] = SimpleQueue()
 

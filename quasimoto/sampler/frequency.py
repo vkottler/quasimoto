@@ -12,6 +12,7 @@ from runtimepy.primitives import Double
 # internal
 from quasimoto.enums.wave import WaveShape
 
+# Middle C.
 DEFAULT_FREQUENCY = 261.63
 
 
@@ -23,7 +24,6 @@ class HasFrequencyMixin:
 
         self.frequency = Double(value=frequency)
 
-        # Need to populate the rest.
         self.by_shape: dict[int, Callable[[float], float]] = {
             WaveShape.SINE: self.sin,
             WaveShape.TRIANGLE: self.triangle,

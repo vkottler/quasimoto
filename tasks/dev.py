@@ -6,7 +6,7 @@ A module implementing developmental runtimepy interfaces.
 import asyncio
 from contextlib import contextmanager
 import math
-from typing import Iterator
+from typing import Iterator, cast
 
 # third-party
 import pyaudio
@@ -18,7 +18,7 @@ from runtimepy.primitives import Double
 from quasimoto.enums.wave import WaveShape
 from quasimoto.sampler import Sampler
 from quasimoto.sampler.time import TimeKeeper
-from tasks.stereo import StereoInterface
+from quasimoto.stereo import StereoInterface
 
 
 @contextmanager
@@ -49,14 +49,23 @@ class StereoTask(ArbiterTask):
         # register wave shape enum
         WaveShape.register_enum(self.env.enums)
 
-        sampler = self.stereo.left
+        # need to get this out of here
+        test = Sampler(self.stereo.time)
+        self.stereo.left.register_source("test", test)
+        self.stereo.right.register_source("test", test.copy(harmonic=-1))
+
+        # remove at some point
+        sampler = cast(Sampler, self.stereo.left.sources["test"])
+
         self.env.channel("left.frequency", sampler.frequency, commandable=True)
         self.env.channel("left.amplitude", sampler.amplitude, commandable=True)
         self.env.channel(
             "left.shape", sampler.shape, commandable=True, enum="WaveShape"
         )
 
-        sampler = self.stereo.right
+        # remove at some point
+        sampler = cast(Sampler, self.stereo.right.sources["test"])
+
         self.env.channel(
             "right.frequency", sampler.frequency, commandable=True
         )
@@ -79,8 +88,11 @@ class StereoTask(ArbiterTask):
     ) -> Iterator[pyaudio.Stream]:
         """Get a pyaudio stream."""
 
+        # remove at some point
+        num_bits = 16
+
         stream = audio.open(
-            format=audio.get_format_from_width(stereo.left.num_bits // 8),
+            format=audio.get_format_from_width(num_bits // 8),
             channels=stereo.num_channels,
             rate=stereo.time.sample_rate,
             stream_callback=stereo.callback,
@@ -143,17 +155,22 @@ async def main(app: AppInfo) -> int:
     while not app.stop.is_set():
         # Conform to 0-1 domain.
         raw = (math.sin(math.tau * loop.time() * freq) + 1.0) / 2.0
+        flipped = 1 - raw
 
         # Re-assign
-        stereo.left.amplitude.value = raw
-        stereo.right.amplitude.value = 1 - raw
+        for source in stereo.left.sources.values():
+            source.amplitude.value = raw
+        for source in stereo.right.sources.values():
+            source.amplitude.value = flipped
 
         # Change the wave shapes.
         if step % 100 == 0:
-            curr: int = 1 + (int(stereo.left.shape.value) % 4)
-            stereo.left.shape.value = curr
-            stereo.right.shape.value = curr
-            app.logger.info("Switched wave shape to %s.", WaveShape(curr).name)
+            for source in stereo.left.sources.values():
+                if isinstance(source, Sampler):
+                    source.next_shape()
+            for source in stereo.right.sources.values():
+                if isinstance(source, Sampler):
+                    source.next_shape()
 
         # Run periodically.
         await asyncio.sleep(0.01)
