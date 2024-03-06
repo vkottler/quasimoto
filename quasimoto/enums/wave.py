@@ -39,6 +39,7 @@ class WaveShape(RuntimeIntEnum):
     SAWTOOTH = 4
 
 
+WaveShapelike = WaveShape | int | str
 WaveShape.register_enum(ENUMS)
 BYTE_ORDER = ByteOrder.LITTLE_ENDIAN
 
