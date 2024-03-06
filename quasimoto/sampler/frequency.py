@@ -7,21 +7,26 @@ import math
 from typing import Callable
 
 # third-party
-from runtimepy.primitives import Double
+from runtimepy.primitives import Double, create
 
 # internal
-from quasimoto.enums.wave import WaveShape
-
-# Middle C.
-DEFAULT_FREQUENCY = 261.63
+from quasimoto.enums.wave import WaveShape, WaveShapelike
+from quasimoto.sampler.notes import DEFAULT_FREQUENCY
 
 
 class HasFrequencyMixin:
     """A simple mixin class for classes that have some frequency component."""
 
-    def __init__(self, frequency: float = DEFAULT_FREQUENCY) -> None:
+    def __init__(
+        self,
+        frequency: float = DEFAULT_FREQUENCY,
+        shape: WaveShapelike = WaveShape.SINE,
+    ) -> None:
         """Initialize this instance."""
 
+        # Can be changed after initialization.
+        self.shape = create(WaveShape.primitive())
+        self.shape.value = WaveShape.normalize(shape)
         self.frequency = Double(value=frequency)
 
         self.by_shape: dict[int, Callable[[float], float]] = {
@@ -30,6 +35,10 @@ class HasFrequencyMixin:
             WaveShape.SQUARE: self.square,
             WaveShape.SAWTOOTH: self.sawtooth,
         }
+
+    def next_shape(self) -> None:
+        """Increment to the next shape."""
+        self.shape.value = 1 + (int(self.shape.value) % 4)
 
     def harmonic(self, index: int) -> float:
         """Get a harmonic frequency based on this instance's frequency."""

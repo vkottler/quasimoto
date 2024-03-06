@@ -4,11 +4,10 @@ A module implementing a signal channel.
 
 # built-in
 from copy import copy
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 # internal
-from quasimoto.sampler.frequency import DEFAULT_FREQUENCY
-from quasimoto.sampler.source import SourceInterface
+from quasimoto.sampler.source import DEFAULT, SourceInterface, SourceParameters
 from quasimoto.sampler.time import TimeKeeper
 
 
@@ -33,14 +32,13 @@ class SignalChannel(SourceInterface):
     """
 
     def __init__(
-        self,
-        time_keeper: TimeKeeper,
-        stop_time: float = None,
-        frequency: float = DEFAULT_FREQUENCY,
+        self, time_keeper: TimeKeeper, params: SourceParameters = DEFAULT
     ) -> None:
         """Initialize this instance."""
 
-        super().__init__(time_keeper, stop_time=stop_time, frequency=frequency)
+        super().__init__(time_keeper, params=params)
+
+        self.factories: dict[str, type[SourceInterface]] = {}
         self.sources: dict[str, SourceInterface] = {}
 
     def value(self, now: float) -> int:
@@ -56,14 +54,15 @@ class SignalChannel(SourceInterface):
 
         # Sample all sources.
         for name, source in self.sources.items():
-            raw = next(source, None)
-            if raw is not None:
-                contributors += 1
+            if source.enabled:
+                raw = next(source, None)
+                if raw is not None:
+                    contributors += 1
 
-                # Apply source-specific amplitudes here.
-                value += raw * source.amplitude.value
-            else:
-                to_remove.append(name)
+                    # Apply source-specific amplitudes here.
+                    value += raw * source.amplitude.value
+                else:
+                    to_remove.append(name)
 
         # Weigh each signal source equally by dividing the final result by
         # the number of contributing sources.
@@ -82,7 +81,30 @@ class SignalChannel(SourceInterface):
         """Create a copy of this instance."""
 
         result = SignalChannel(self.time_keeper)
+
+        # Registered sources have per-instance lifespan.
         result.sources = copy(self.sources)
+
+        # Factories are shared.
+        result.factories = self.factories
+
+        return result
+
+    def register_factory(
+        self, source: type[SourceInterface]
+    ) -> SignalOperationResult:
+        """Attempt to register a source type."""
+
+        result = SUCCESS
+
+        name = source.__name__.lower()
+        if name in self.factories:
+            result = SignalOperationResult(
+                False, f"Duplicate source '{name}'."
+            )
+        else:
+            self.factories[name] = source
+
         return result
 
     def register_source(
@@ -104,6 +126,21 @@ class SignalChannel(SourceInterface):
             self.sources[name] = source
 
         return result
+
+    def register_dynamic(
+        self,
+        name: str,
+        factory: type[SourceInterface] | str,
+        data: dict[str, Any] = None,
+    ) -> SignalOperationResult:
+        """Register a dynamic source."""
+
+        if isinstance(factory, str):
+            factory = self.factories[factory]
+
+        return self.register_source(
+            name, factory.create(self.time_keeper, data=data)
+        )
 
     def remove_source(self, name: str) -> SignalOperationResult:
         """Attempt to register a signal source."""
