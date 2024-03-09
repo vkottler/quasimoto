@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator
 from copy import copy
 from pathlib import Path
-from typing import Any, NamedTuple, Optional, TypeVar
+from typing import Any, TypeVar
 
 # third-party
 import matplotlib.pyplot as plt
@@ -15,38 +15,13 @@ from runtimepy.primitives import Bool, Double
 
 # internal
 from quasimoto.enums.wave import WaveShape
-from quasimoto.sampler.frequency import DEFAULT_FREQUENCY, HasFrequencyMixin
+from quasimoto.sampler.frequency import HasFrequencyMixin
+from quasimoto.sampler.parameters import DEFAULT, SourceParameters
 from quasimoto.sampler.time import TimeKeeper
 
 T = TypeVar("T", bound="SourceInterface")
 DEFAULT_AMPLITUDE = 1.0
 DEFAULT_SHAPE = WaveShape.SINE
-
-
-class SourceParameters(NamedTuple):
-    """A container for parameters used to instantiate sources."""
-
-    stop_time: Optional[float] = None
-    duration: Optional[float] = None
-    frequency: float = DEFAULT_FREQUENCY
-    amplitude: float = DEFAULT_AMPLITUDE
-    shape: WaveShape = DEFAULT_SHAPE
-    enabled: bool = True
-
-    @staticmethod
-    def from_dict(data: dict[str, Any]) -> "SourceParameters":
-        """Get source parameters from dictionary data."""
-
-        return SourceParameters(
-            stop_time=data.get("stop_time"),
-            duration=data.get("duration"),
-            frequency=data.get("frequency", DEFAULT_FREQUENCY),
-            amplitude=data.get("amplitude", DEFAULT_AMPLITUDE),
-            shape=WaveShape.normalize(data.get("shape", DEFAULT_SHAPE)),
-        )
-
-
-DEFAULT = SourceParameters()
 
 
 class SourceInterface(HasFrequencyMixin, Iterable[int], ABC):
@@ -69,6 +44,21 @@ class SourceInterface(HasFrequencyMixin, Iterable[int], ABC):
         # Amplitude should be applied by the iterator/caller.
         self.enabled = Bool(value=params.enabled)
         self.amplitude = Double(value=self.params.amplitude)
+
+        self.enable_time: float = 0.0
+
+        def _enable_event(now: float) -> None:
+            """A simple method for enabling this source."""
+            self.enable_time = now
+            self.enabled.value = True
+
+        self.enable_event = _enable_event
+
+        def _disable_event(_: float) -> None:
+            """A simple method for disabling this source."""
+            self.enabled.value = False
+
+        self.disable_event = _disable_event
 
     def set_duration(self, duration: float = None) -> None:
         """Set a duration for this source."""

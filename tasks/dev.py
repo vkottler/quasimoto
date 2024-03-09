@@ -6,9 +6,11 @@ A module implementing developmental runtimepy interfaces.
 import asyncio
 from contextlib import contextmanager
 import math
+from pathlib import Path
 from typing import Iterator
 
 # third-party
+import mido
 import pyaudio
 from runtimepy.net.arbiter import AppInfo
 from runtimepy.net.arbiter.task import ArbiterTask, TaskFactory
@@ -17,7 +19,9 @@ from runtimepy.primitives import Double
 # internal
 from quasimoto.enums.wave import WaveShape
 from quasimoto.sampler import Sampler
+from quasimoto.sampler.channel import SignalChannel
 from quasimoto.sampler.notes import Note
+from quasimoto.sampler.parameters import SourceParameters
 from quasimoto.sampler.signature import beat_period
 from quasimoto.sampler.source import SourceInterface
 from quasimoto.sampler.time import TimeCallback, TimeKeeper
@@ -159,12 +163,83 @@ def sinusoidal_amplitude(stereo: StereoInterface, freq: float = 0.5) -> None:
         source.amplitude.value = flipped
 
 
+def channel_note(channel: SignalChannel, index: int) -> SourceInterface:
+    """Get the note source for a channel given a note's index."""
+
+    note, offset = Note.from_index(index)
+    name = f"{note.name}{offset}"
+
+    # Register source if necessary.
+    if name not in channel.sources:
+        # Create source for note.
+        new_source = Sampler(
+            channel.time_keeper,
+            params=SourceParameters.from_note(note, octave_offset=offset),
+        )
+
+        # Disable by default.
+        new_source.enabled.value = False
+
+        assert channel.register_source(name, new_source)
+
+    return channel.sources[name]
+
+
+def handle_note_state(stereo: StereoInterface, curr_time: float, msg) -> None:
+    """Handle registering a note-state event."""
+
+    for channel in (stereo.left, stereo.right):
+        source = channel_note(channel, msg.note)
+
+        is_on = "on" in msg.type
+
+        handler = source.enable_event if is_on else source.disable_event
+
+        # Register event.
+        event_time = curr_time + msg.time
+
+        # Handle ending on a zero point, extend to the nearest phase start.
+        # if not is_on:
+        #     event_time = source.quantize_to_period(event_time)
+
+        # source.quantize_to_period(event_time)
+        stereo.time.call_at(source.quantize_to_period(event_time), handler)
+
+
 async def main(app: AppInfo) -> int:
     """Waits for the stop signal to be set."""
 
-    # create_plots()
-
     stereo = list(app.search_tasks(kind=StereoTask))[0].stereo
+
+    curr_time = stereo.time.time
+
+    for msg in mido.MidiFile(
+        Path(__file__).parent.joinpath("data", "C_minor_G7_transition.mid")
+    ):
+        # Handle control messages.
+        if msg.is_cc():
+            print(msg.type)
+
+        # Handle meta messages.
+        elif msg.is_meta:
+            print(msg.type)
+
+        # Handle turning notes on and off.
+        elif msg.type.startswith("note"):
+            handle_note_state(stereo, curr_time, msg)
+
+        # Print messages not handled.
+        else:
+            print(msg.type)
+
+        curr_time += msg.time
+
+    while not app.stop.is_set():
+        await asyncio.sleep(1.0)
+
+    return 0
+
+    # create_plots()
 
     # register factories
     assert stereo.left.register_factory(Sampler)

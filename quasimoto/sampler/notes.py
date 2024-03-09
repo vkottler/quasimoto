@@ -5,7 +5,8 @@ A module implementing an interface to musical notes.
 # third-party
 from runtimepy.enum.registry import RuntimeIntEnum
 
-TWELVE_TONE_EQUAL: float = 2 ** (1 / 12)
+DIVISIONS = 12
+TWELVE_TONE_EQUAL: float = 2 ** (1 / DIVISIONS)
 
 ROOT_FREQUENCY = 8.175799
 
@@ -56,7 +57,12 @@ class Note(RuntimeIntEnum):
 
     def frequency(self, octave_offset: int = 0) -> float:
         """Get the frequency of a note."""
-        return note_by_index(12 * (OCTAVE_BASE + octave_offset) + self)
+        return note_by_index(DIVISIONS * (octave_offset + OCTAVE_BASE) + self)
+
+    @staticmethod
+    def from_index(index: int) -> tuple["Note", int]:
+        """Get a note from a specified index."""
+        return Note(index % DIVISIONS), (index // 12) - OCTAVE_BASE
 
 
 DEFAULT_FREQUENCY: float = Note.C.frequency()
