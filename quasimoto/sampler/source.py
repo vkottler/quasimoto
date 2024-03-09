@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator
 from copy import copy
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, Callable, TypeVar
 
 # third-party
 import matplotlib.pyplot as plt
@@ -18,6 +18,7 @@ from quasimoto.enums.wave import WaveShape
 from quasimoto.sampler.frequency import HasFrequencyMixin
 from quasimoto.sampler.parameters import DEFAULT, SourceParameters
 from quasimoto.sampler.time import TimeKeeper
+from quasimoto.wave.writer import WaveWriter
 
 T = TypeVar("T", bound="SourceInterface")
 DEFAULT_AMPLITUDE = 1.0
@@ -119,18 +120,35 @@ class SourceInterface(HasFrequencyMixin, Iterable[int], ABC):
 
         return self.value(self.time_keeper.time)
 
-    def plot(self, path: Path | str, duration_s: float) -> None:
-        """Create a ."""
+    def sample_for(
+        self, duration_s: float, handler: Callable[[int], None]
+    ) -> None:
+        """Sample this source for the specified duration."""
 
         # Copy self and our time keeper to create equivalent but independent
         # results.
         inst = self.copy()
         inst.time_keeper = self.time_keeper.copy()
 
-        data = []
         for _ in range(inst.time_keeper.num_samples(duration_s)):
-            data.append(next(inst))
+            handler(next(inst))
             inst.time_keeper.advance()
 
-        plt.plot(data)
+    def get_samples(self, duration_s: float) -> list[int]:
+        """Collect samples."""
+        data: list[int] = []
+        self.sample_for(duration_s, data.append)
+        return data
+
+    def plot(self, path: Path | str, duration_s: float) -> None:
+        """Create a plot."""
+
+        # Plot data.
+        plt.plot(self.get_samples(duration_s))
         plt.savefig(str(path), bbox_inches="tight")
+
+    def to_wave(self, path: Path, duration_s: float) -> None:
+        """Write this source to a wave file."""
+
+        with WaveWriter.from_path(path) as writer:
+            writer.write([(x, x) for x in self.get_samples(duration_s)])

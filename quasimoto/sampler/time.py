@@ -92,7 +92,12 @@ class TimeKeeper(PeriodMixin):
 
     def __copy__(self: T) -> T:
         """Get a copy of this instance."""
-        return type(self)(time=self.time, sample_rate=self.sample_rate)
+
+        result = type(self)(time=self.time, sample_rate=self.sample_rate)
+
+        result.callbacks = copy(self.callbacks)
+
+        return result
 
     def copy(self: T) -> T:
         """Get a copy of this instance."""

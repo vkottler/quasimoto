@@ -30,6 +30,9 @@ class StereoInterface:
 
         self.sample_queue: SimpleQueue[tuple[int, int]] = SimpleQueue()
 
+        self.left_raw: list[int] = []
+        self.right_raw: list[int] = []
+
     def next(self) -> tuple[int, int]:
         """Get the next pair of samples."""
 
@@ -53,9 +56,12 @@ class StereoInterface:
             # Get pre-computed samples from queue.
             from_queue = min(self.sample_queue.qsize(), frame_count)
             for _ in range(from_queue):
-                left_sample, right_sample = self.sample_queue.get_nowait()
-                WaveWriter.to_stream(stream, left_sample)
-                WaveWriter.to_stream(stream, right_sample)
+                left, right = self.sample_queue.get_nowait()
+                WaveWriter.to_stream(stream, left)
+                WaveWriter.to_stream(stream, right)
+
+                self.left_raw.append(left)
+                self.right_raw.append(right)
 
             # Get new samples if necessary.
             frame_count -= from_queue
@@ -63,6 +69,9 @@ class StereoInterface:
                 left, right = self.next()
                 WaveWriter.to_stream(stream, left)
                 WaveWriter.to_stream(stream, right)
+
+                self.left_raw.append(left)
+                self.right_raw.append(right)
 
             return stream.getvalue()
 
