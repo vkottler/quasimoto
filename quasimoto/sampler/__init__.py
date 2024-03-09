@@ -3,7 +3,8 @@ A module implementing sampler interfaces.
 """
 
 # internal
-from quasimoto.sampler.source import DEFAULT, SourceInterface, SourceParameters
+from quasimoto.sampler.parameters import DEFAULT, SourceParameters
+from quasimoto.sampler.source import SourceInterface
 from quasimoto.sampler.time import TimeKeeper
 from quasimoto.wave.writer import DEFAULT_BITS
 
@@ -35,7 +36,11 @@ class Sampler(SourceInterface):
     def value(self, now: float) -> int:
         """Get the next value."""
 
+        # Handle phase.
+        time = now
+        # time = now - self.enable_time
+
         # Select underlying wave generator.
         return int(
-            self.scalar * self.by_shape[self.shape.value](now)  # type: ignore
+            self.scalar * self.by_shape[self.shape.value](time)  # type: ignore
         )

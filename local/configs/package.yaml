@@ -4,6 +4,7 @@ version: "{{major}}.{{minor}}.{{patch}}"
 description: A lossless audio generator.
 entry: {{entry}}
 requirements:
+  - mido
   - vcorelib
   - runtimepy
   - scipy
@@ -21,4 +22,7 @@ mypy_local: |
   ignore_missing_imports = True
 
   [mypy-pyaudio.*]
+  ignore_missing_imports = True
+
+  [mypy-mido.*]
   ignore_missing_imports = True

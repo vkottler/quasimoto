@@ -52,6 +52,11 @@ class HasFrequencyMixin:
         """Obtain the period for this frequency."""
         return 1.0 / self.frequency.value
 
+    def quantize_to_period(self, time: float) -> float:
+        """Return time extended to the next start-of-period."""
+        period = self.period()
+        return time + (period - divmod(time, period)[1])
+
     def triangle(self, now: float) -> float:
         """Get a raw triangle-wave value sample."""
 

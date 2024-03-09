@@ -7,7 +7,8 @@ from copy import copy
 from typing import Any, NamedTuple
 
 # internal
-from quasimoto.sampler.source import DEFAULT, SourceInterface, SourceParameters
+from quasimoto.sampler.parameters import DEFAULT, SourceParameters
+from quasimoto.sampler.source import SourceInterface
 from quasimoto.sampler.time import TimeKeeper
 
 
