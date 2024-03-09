@@ -7,9 +7,10 @@ import asyncio
 from contextlib import contextmanager
 import math
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, Optional
 
 # third-party
+import matplotlib.pyplot as plt
 import mido
 import pyaudio
 from runtimepy.net.arbiter import AppInfo
@@ -26,6 +27,7 @@ from quasimoto.sampler.signature import beat_period
 from quasimoto.sampler.source import SourceInterface
 from quasimoto.sampler.time import TimeCallback, TimeKeeper
 from quasimoto.stereo import StereoInterface
+from quasimoto.wave.writer import WaveWriter
 
 
 @contextmanager
@@ -45,7 +47,7 @@ class StereoTask(ArbiterTask):
     auto_finalize = True
 
     audio: pyaudio.PyAudio
-    stream: pyaudio.Stream
+    stream: Optional[pyaudio.Stream]
 
     def register_source_state(
         self, name: str, source: SourceInterface, commandable: bool = True
@@ -76,6 +78,10 @@ class StereoTask(ArbiterTask):
             "buffer_depth_scalar", self.buffer_depth_scalar, commandable=True
         )
 
+        # Set this to true when audio should start.
+        self.start = False
+        self.stream = None
+
     @staticmethod
     @contextmanager
     def get_stream(
@@ -102,22 +108,28 @@ class StereoTask(ArbiterTask):
         """Initialize this task with application information."""
 
         await super().init(app)
-
         self.audio = app.stack.enter_context(get_pyaudio())
-
-        self.stream = app.stack.enter_context(
-            StereoTask.get_stream(self.audio, self.stereo)
-        )
 
     async def dispatch(self) -> bool:
         """Dispatch an iteration of this task."""
 
-        result: bool = self.stream.is_active()
-        if result:
-            # Populate 10x our period
-            self.stereo.buffer_to_duration(
-                self.period_s.value * self.buffer_depth_scalar.value
+        # Initialize when ready.
+        if self.start and self.stream is None:
+            self.stream = self.app.stack.enter_context(
+                StereoTask.get_stream(self.audio, self.stereo)
             )
+
+        result = True
+
+        if self.stream is not None:
+            result = self.stream.is_active()
+            if result:
+                # This is kind of doing nothing.
+                # Populate 10x our period
+                # self.stereo.buffer_to_duration(
+                #     self.period_s.value * self.buffer_depth_scalar.value
+                # )
+                pass
 
         return result
 
@@ -202,14 +214,14 @@ def handle_note_state(stereo: StereoInterface, curr_time: float, msg) -> None:
         # if not is_on:
         #     event_time = source.quantize_to_period(event_time)
 
-        # source.quantize_to_period(event_time)
         stereo.time.call_at(source.quantize_to_period(event_time), handler)
 
 
 async def main(app: AppInfo) -> int:
     """Waits for the stop signal to be set."""
 
-    stereo = list(app.search_tasks(kind=StereoTask))[0].stereo
+    stereo_task = list(app.search_tasks(kind=StereoTask))[0]
+    stereo = stereo_task.stereo
 
     curr_time = stereo.time.time
 
@@ -234,8 +246,25 @@ async def main(app: AppInfo) -> int:
 
         curr_time += msg.time
 
-    while not app.stop.is_set():
-        await asyncio.sleep(1.0)
+    # stereo.left.plot(Path("test.png"), 10.0)
+    # stereo.left.to_wave(Path("test.wav"), 10.0)
+
+    # Signal that task should start.
+    stereo_task.start = True
+
+    # while not app.stop.is_set():
+    #    await asyncio.sleep(1.0)
+
+    await asyncio.sleep(10.0)
+
+    with WaveWriter.from_path(Path("test.wav")) as writer:
+        samples = []
+        for left, right in zip(stereo.left_raw, stereo.right_raw):
+            samples.append((left, right))
+        writer.write(samples)
+
+    plt.plot(stereo.left_raw)
+    plt.savefig("test.png", bbox_inches="tight")
 
     return 0
 

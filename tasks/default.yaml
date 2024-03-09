@@ -6,4 +6,4 @@ factories:
   - {name: tasks.dev.Stereo}
 
 tasks:
-  - {name: stereo, factory: stereo, period_s: 0.02}
+  - {name: stereo, factory: stereo, period_s: 0.01}
