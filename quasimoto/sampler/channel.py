@@ -7,6 +7,7 @@ from copy import copy
 from typing import Any, NamedTuple
 
 # internal
+from quasimoto.sampler.frequency import proportion_pool
 from quasimoto.sampler.parameters import DEFAULT, SourceParameters
 from quasimoto.sampler.source import SourceInterface
 from quasimoto.sampler.time import TimeKeeper
@@ -42,6 +43,10 @@ class SignalChannel(SourceInterface):
         self.factories: dict[str, type[SourceInterface]] = {}
         self.sources: dict[str, SourceInterface] = {}
 
+        # make this based on sample rate at some point
+        # self.proportion_step = 0.005
+        self.proportion_step = 0.001
+
     def value(self, now: float) -> int:
         """Get the next value."""
 
@@ -50,25 +55,26 @@ class SignalChannel(SourceInterface):
         del now
 
         value = 0.0
-        contributors = 0
+
         to_remove = []
+        sources_raw = []
 
-        # Sample all sources.
         for name, source in self.sources.items():
-            if source.enabled:
-                raw = next(source, None)
-                if raw is not None:
-                    contributors += 1
+            raw = next(source, None)
+            if raw is not None:
+                sources_raw.append((source, raw))
+            else:
+                to_remove.append(name)
 
-                    # Apply source-specific amplitudes here.
-                    value += raw * source.amplitude.value
-                else:
-                    to_remove.append(name)
+        # Handle proportion pooling.
+        proportion_pool(
+            self.proportion_step,
+            *(x[0] for x in sources_raw),
+        )
 
-        # Weigh each signal source equally by dividing the final result by
-        # the number of contributing sources.
-        if contributors > 1:
-            value /= contributors
+        # Compute value.
+        for source, raw in sources_raw:
+            value += raw * source.proportion * source.amplitude.value
 
         # Apply our amplitude.
         value *= self.amplitude.value
@@ -76,7 +82,8 @@ class SignalChannel(SourceInterface):
         for name in to_remove:
             assert self.remove_source(name), name
 
-        return int(value)
+        # jank
+        return max(min(int(value), 32767), -32768)
 
     def __copy__(self) -> "SignalChannel":
         """Create a copy of this instance."""

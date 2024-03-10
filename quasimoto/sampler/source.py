@@ -11,10 +11,9 @@ from typing import Any, Callable, TypeVar
 
 # third-party
 import matplotlib.pyplot as plt
-from runtimepy.primitives import Bool, Double
+from runtimepy.primitives import Double
 
 # internal
-from quasimoto.enums.wave import WaveShape
 from quasimoto.sampler.frequency import HasFrequencyMixin
 from quasimoto.sampler.parameters import DEFAULT, SourceParameters
 from quasimoto.sampler.time import TimeKeeper
@@ -22,7 +21,6 @@ from quasimoto.wave.writer import WaveWriter
 
 T = TypeVar("T", bound="SourceInterface")
 DEFAULT_AMPLITUDE = 1.0
-DEFAULT_SHAPE = WaveShape.SINE
 
 
 class SourceInterface(HasFrequencyMixin, Iterable[int], ABC):
@@ -43,14 +41,11 @@ class SourceInterface(HasFrequencyMixin, Iterable[int], ABC):
         self.set_duration(self.params.duration)
 
         # Amplitude should be applied by the iterator/caller.
-        self.enabled = Bool(value=params.enabled)
+        self.enabled.value = params.enabled
         self.amplitude = Double(value=self.params.amplitude)
 
-        self.enable_time: float = 0.0
-
-        def _enable_event(now: float) -> None:
+        def _enable_event(_: float) -> None:
             """A simple method for enabling this source."""
-            self.enable_time = now
             self.enabled.value = True
 
         self.enable_event = _enable_event
