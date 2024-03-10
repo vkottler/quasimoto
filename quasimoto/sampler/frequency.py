@@ -7,7 +7,7 @@ import math
 from typing import Callable
 
 # third-party
-from runtimepy.primitives import Double, create
+from runtimepy.primitives import Bool, Double, create
 
 # internal
 from quasimoto.enums.wave import WaveShape, WaveShapelike
@@ -35,6 +35,10 @@ class HasFrequencyMixin:
             WaveShape.SQUARE: self.square,
             WaveShape.SAWTOOTH: self.sawtooth,
         }
+
+        # Used by proportion pool.
+        self.proportion: float = 0.0
+        self.enabled = Bool(value=False)
 
     def next_shape(self) -> None:
         """Increment to the next shape."""
@@ -78,3 +82,42 @@ class HasFrequencyMixin:
 
         phase = now / self.period()
         return 2.0 * (phase - math.floor(0.5 + phase))
+
+
+def proportion_pool(step: float, *instances: HasFrequencyMixin) -> None:
+    """Handle updating instance proportions."""
+
+    count = len(instances)
+
+    total = 0.0
+
+    for inst in instances:
+        if not inst.enabled:
+            curr = inst.proportion
+            if curr > 0.0:
+                inst.proportion = max(0.0, curr - step)
+                total += inst.proportion
+
+            count -= 1
+
+    if count == 0:
+        return
+
+    # Factor in bandwidth used by currently-disabled sources.
+    equal = (1.0 - total) / count
+
+    for inst in instances:
+        if inst.enabled:
+            curr = inst.proportion
+            if not math.isclose(curr, equal):
+                delta = min(abs(curr - equal), step)
+                if curr > equal:
+                    curr -= delta
+                else:
+                    curr += delta
+
+                inst.proportion = curr
+                total += curr
+
+    # Check for correctness.
+    # assert total <= 1.0, total

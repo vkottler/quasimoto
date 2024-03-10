@@ -3,7 +3,7 @@ ignored-modules=pyaudio
 
 [DESIGN]
 max-args=7
-max-attributes=8
+max-attributes=9
 
 [MESSAGES CONTROL]
 disable=too-few-public-methods

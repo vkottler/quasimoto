@@ -250,12 +250,15 @@ async def main(app: AppInfo) -> int:
     # stereo.left.to_wave(Path("test.wav"), 10.0)
 
     # Signal that task should start.
-    stereo_task.start = True
+    # stereo_task.start = True
 
     # while not app.stop.is_set():
     #    await asyncio.sleep(1.0)
 
-    await asyncio.sleep(10.0)
+    # await asyncio.sleep(20.0)
+
+    duration = 15.0
+    stereo.frames(int(duration / stereo.time.period))
 
     with WaveWriter.from_path(Path("test.wav")) as writer:
         samples = []
