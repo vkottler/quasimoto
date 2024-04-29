@@ -2,7 +2,7 @@
     =====================================
     generator=datazen
     version=3.1.4
-    hash=018543b1acb813e792af40f264f6ea54
+    hash=ab6d0eebd2bc2492823429b5b49a507d
     =====================================
 -->
 
@@ -45,7 +45,7 @@ This package is tested on the following platforms:
 # Command-line Options
 
 ```
-$ ./venv3.11/bin/quasimoto -h
+$ ./venv3.12/bin/quasimoto -h
 
 usage: quasimoto [-h] [--version] [-v] [-q] [--curses] [--no-uvloop] [-C DIR]
                  {gen,noop} ...
