@@ -18,6 +18,7 @@ from runtimepy.net.arbiter.task import ArbiterTask, TaskFactory
 from runtimepy.primitives import Double
 
 # internal
+from quasimoto import PKG_NAME
 from quasimoto.enums.wave import WaveShape
 from quasimoto.sampler import Sampler
 from quasimoto.sampler.channel import SignalChannel
@@ -217,17 +218,13 @@ def handle_note_state(stereo: StereoInterface, curr_time: float, msg) -> None:
         stereo.time.call_at(source.quantize_to_period(event_time), handler)
 
 
-async def main(app: AppInfo) -> int:
-    """Waits for the stop signal to be set."""
-
-    stereo_task = list(app.search_tasks(kind=StereoTask))[0]
-    stereo = stereo_task.stereo
+def process_midi_file(path: Path, stereo: StereoInterface) -> float:
+    """Return duration."""
 
     curr_time = stereo.time.time
+    last_note_time = curr_time
 
-    for msg in mido.MidiFile(
-        Path(__file__).parent.joinpath("data", "C_minor_G7_transition.mid")
-    ):
+    for msg in mido.MidiFile(path):
         # Handle control messages.
         if msg.is_cc():
             print(msg.type)
@@ -239,12 +236,29 @@ async def main(app: AppInfo) -> int:
         # Handle turning notes on and off.
         elif msg.type.startswith("note"):
             handle_note_state(stereo, curr_time, msg)
+            last_note_time = curr_time
 
         # Print messages not handled.
         else:
             print(msg.type)
 
         curr_time += msg.time
+
+    return last_note_time - stereo.time.time
+
+
+async def main(app: AppInfo) -> int:
+    """Waits for the stop signal to be set."""
+
+    stereo_task = list(app.search_tasks(kind=StereoTask))[0]
+    stereo = stereo_task.stereo
+
+    midi_name = app.config_param("midi_name", "C_minor_G7_transition")
+
+    path = Path(__file__).parent.joinpath("data", f"{midi_name}.mid")
+
+    with app.log_time("Processing '%s'", path, reminder=True):
+        duration = process_midi_file(path, stereo)
 
     # stereo.left.plot(Path("test.png"), 10.0)
     # stereo.left.to_wave(Path("test.wav"), 10.0)
@@ -257,17 +271,32 @@ async def main(app: AppInfo) -> int:
 
     # await asyncio.sleep(20.0)
 
-    duration = 15.0
-    stereo.frames(int(duration / stereo.time.period))
+    num_frames = int(duration / stereo.time.period)
+    with app.log_time(
+        "Rendering %d sample frames (%fs @ %d Hz)",
+        num_frames,
+        duration,
+        stereo.time.sample_rate,
+        reminder=True,
+    ):
+        stereo.frames(num_frames)
 
-    with WaveWriter.from_path(Path("test.wav")) as writer:
+    output = Path(f"{PKG_NAME}-out")
+    output.mkdir(exist_ok=True)
+
+    path = output.joinpath(f"{midi_name}.wav")
+    with WaveWriter.from_path(path) as writer:
         samples = []
         for left, right in zip(stereo.left_raw, stereo.right_raw):
             samples.append((left, right))
-        writer.write(samples)
 
-    plt.plot(stereo.left_raw)
-    plt.savefig("test.png", bbox_inches="tight")
+        with app.log_time("Writing '%s'", path, reminder=True):
+            writer.write(samples)
+
+    path = output.joinpath(f"{midi_name}.png")
+    with app.log_time("Rendering '%s'", path, reminder=True):
+        plt.plot(stereo.left_raw)
+        plt.savefig(path, bbox_inches="tight")
 
     # create_plots()
 
