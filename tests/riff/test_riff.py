@@ -14,6 +14,7 @@ from vcorelib.paths.context import tempfile
 # module under test
 from quasimoto.riff import RiffInterface
 from quasimoto.sampler import Sampler
+from quasimoto.sampler.parameters import SourceParameters
 from quasimoto.sampler.time import TimeKeeper
 from quasimoto.wave import WaveReader, WaveWriter
 
@@ -58,18 +59,18 @@ def test_writing_test_wav():
     with WaveWriter.from_path(Path("test.wav")) as writer:
         stop_time = 4.0
         time = TimeKeeper()
-        base = Sampler(time, stop_time=stop_time)
+        base = Sampler(time, params=SourceParameters(stop_time=stop_time))
         assert iter(base)
 
         samplers = set(
             [
-                base.copy(3, stop_time=stop_time / 8.0),
-                base.copy(2, stop_time=stop_time / 4.0),
-                base.copy(1, stop_time=stop_time / 2.0),
+                base.clone(3, stop_time=stop_time / 8.0),
+                base.clone(2, stop_time=stop_time / 4.0),
+                base.clone(1, stop_time=stop_time / 2.0),
                 base,
-                base.copy(-1, stop_time=stop_time / 2.0),
-                base.copy(-2, stop_time=stop_time / 4.0),
-                base.copy(-3, stop_time=stop_time / 8.0),
+                base.clone(-1, stop_time=stop_time / 2.0),
+                base.clone(-2, stop_time=stop_time / 4.0),
+                base.clone(-3, stop_time=stop_time / 8.0),
             ]
         )
 

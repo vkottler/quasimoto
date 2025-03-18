@@ -1,7 +1,7 @@
 # =====================================
 # generator=datazen
-# version=3.1.4
-# hash=281a9fdcd0c2f153d07ec1a8acb71936
+# version=3.2.4
+# hash=02f9be3ca89abbf20be353c4f6217c37
 # =====================================
 
 """
@@ -13,7 +13,6 @@ import argparse
 import os
 from pathlib import Path
 import sys
-from typing import List
 
 # third-party
 from vcorelib.logging import init_logging, logging_args
@@ -23,7 +22,7 @@ from quasimoto import DESCRIPTION, VERSION
 from quasimoto.app import add_app_args, entry
 
 
-def main(argv: List[str] = None) -> int:
+def main(argv: list[str] = None) -> int:
     """Program entry-point."""
 
     result = 0

@@ -100,5 +100,6 @@ class WaveReader(FormatMixin):
     @contextmanager
     def from_path(path: Path) -> Iterator["WaveReader"]:
         """Get a WAVE reader from a path."""
+
         with RiffInterface.from_path(path, is_writer=False) as riff:
             yield WaveReader(riff)

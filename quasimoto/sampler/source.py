@@ -98,9 +98,11 @@ class SourceInterface(HasFrequencyMixin, Iterable[int], ABC):
 
         return cls(
             time_keeper,
-            params=SourceParameters.from_dict(data)
-            if data is not None
-            else DEFAULT,
+            params=(
+                SourceParameters.from_dict(data)
+                if data is not None
+                else DEFAULT
+            ),
         )
 
     def __next__(self) -> int:

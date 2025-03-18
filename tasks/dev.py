@@ -269,9 +269,16 @@ async def main(app: AppInfo) -> int:
     plt.plot(stereo.left_raw)
     plt.savefig("test.png", bbox_inches="tight")
 
+    # create_plots()
+
     return 0
 
-    # create_plots()
+
+async def dev(app: AppInfo) -> int:
+    """Waits for the stop signal to be set."""
+
+    stereo_task = list(app.search_tasks(kind=StereoTask))[0]
+    stereo = stereo_task.stereo
 
     # register factories
     assert stereo.left.register_factory(Sampler)
