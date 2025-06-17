@@ -176,7 +176,9 @@ def sinusoidal_amplitude(stereo: StereoInterface, freq: float = 0.5) -> None:
         source.amplitude.value = flipped
 
 
-def channel_note(channel: SignalChannel, index: int) -> SourceInterface:
+def channel_note(
+    channel: SignalChannel, index: int, **kwargs
+) -> SourceInterface:
     """Get the note source for a channel given a note's index."""
 
     note, offset = Note.from_index(index)
@@ -187,7 +189,9 @@ def channel_note(channel: SignalChannel, index: int) -> SourceInterface:
         # Create source for note.
         new_source = Sampler(
             channel.time_keeper,
-            params=SourceParameters.from_note(note, octave_offset=offset),
+            params=SourceParameters.from_note(
+                note, octave_offset=offset, **kwargs
+            ),
         )
 
         # Disable by default.
@@ -198,27 +202,31 @@ def channel_note(channel: SignalChannel, index: int) -> SourceInterface:
     return channel.sources[name]
 
 
-def handle_note_state(stereo: StereoInterface, curr_time: float, msg) -> None:
+def handle_note_state(
+    stereo: StereoInterface, curr_time: float, msg, **kwargs
+) -> None:
     """Handle registering a note-state event."""
 
     for channel in (stereo.left, stereo.right):
-        source = channel_note(channel, msg.note)
+        source = channel_note(channel, msg.note, **kwargs)
 
         is_on = "on" in msg.type
 
-        handler = source.enable_event if is_on else source.disable_event
-
-        # Register event.
         event_time = curr_time + msg.time
 
         # Handle ending on a zero point, extend to the nearest phase start.
         # if not is_on:
         #     event_time = source.quantize_to_period(event_time)
 
-        stereo.time.call_at(source.quantize_to_period(event_time), handler)
+        # stereo.time.call_at(source.quantize_to_period(event_time), handler)
+
+        # Register event.
+        stereo.time.call_at(
+            event_time, source.enable_event if is_on else source.disable_event
+        )
 
 
-def process_midi_file(path: Path, stereo: StereoInterface) -> float:
+def process_midi_file(path: Path, stereo: StereoInterface, **kwargs) -> float:
     """Return duration."""
 
     curr_time = stereo.time.time
@@ -235,7 +243,7 @@ def process_midi_file(path: Path, stereo: StereoInterface) -> float:
 
         # Handle turning notes on and off.
         elif msg.type.startswith("note"):
-            handle_note_state(stereo, curr_time, msg)
+            handle_note_state(stereo, curr_time, msg, **kwargs)
             last_note_time = curr_time
 
         # Print messages not handled.
@@ -247,18 +255,20 @@ def process_midi_file(path: Path, stereo: StereoInterface) -> float:
     return last_note_time - stereo.time.time
 
 
-async def main(app: AppInfo) -> int:
-    """Waits for the stop signal to be set."""
+def audio_synth(app: AppInfo, midi_name: str, shape: WaveShape) -> None:
+    """Write audio from midi."""
 
-    stereo_task = list(app.search_tasks(kind=StereoTask))[0]
-    stereo = stereo_task.stereo
-
-    midi_name = app.config_param("midi_name", "C_minor_G7_transition")
+    # Not necessary to use task when not doing live audio.
+    # stereo = list(app.search_tasks(kind=StereoTask))[0].stereo
+    stereo = StereoInterface()
 
     path = Path(__file__).parent.joinpath("data", f"{midi_name}.mid")
 
     with app.log_time("Processing '%s'", path, reminder=True):
-        duration = process_midi_file(path, stereo)
+        duration = process_midi_file(path, stereo, shape=shape)
+
+    # Allow signal to decay to zero.
+    duration += 0.1
 
     # stereo.left.plot(Path("test.png"), 10.0)
     # stereo.left.to_wave(Path("test.wav"), 10.0)
@@ -284,7 +294,7 @@ async def main(app: AppInfo) -> int:
     output = Path(f"{PKG_NAME}-out")
     output.mkdir(exist_ok=True)
 
-    path = output.joinpath(f"{midi_name}.wav")
+    path = output.joinpath(f"{midi_name}-{shape.name.lower()}.wav")
     with WaveWriter.from_path(path) as writer:
         samples = []
         for left, right in zip(stereo.left_raw, stereo.right_raw):
@@ -293,12 +303,27 @@ async def main(app: AppInfo) -> int:
         with app.log_time("Writing '%s'", path, reminder=True):
             writer.write(samples)
 
-    path = output.joinpath(f"{midi_name}.png")
+    path = output.joinpath(f"{midi_name}-{shape.name.lower()}.png")
     with app.log_time("Rendering '%s'", path, reminder=True):
         plt.plot(stereo.left_raw)
         plt.savefig(path, bbox_inches="tight")
 
     # create_plots()
+
+
+async def main(app: AppInfo) -> int:
+    """Waits for the stop signal to be set."""
+
+    # Should refactor to multi-process pool to generate all in parallel.
+    for midi_name in [
+        "C_minor_G7_transition",
+        "graham_lofi_Bb_minor_arpeggios",
+        "graham_lofi_Bb_minor_chords",
+        "graham_lofi_C_minor_arpeggios",
+        "graham_lofi_C_minor_chords",
+    ]:
+        for shape in ["sine", "triangle", "square", "sawtooth"]:
+            audio_synth(app, midi_name, WaveShape.normalize(shape))
 
     return 0
 

@@ -17,7 +17,7 @@ from quasimoto.riff import RiffInterface
 from quasimoto.riff.chunk import Chunk
 from quasimoto.wave.mixins import FormatMixin
 
-DEFAULT_SAMPLE_RATE = 44100
+DEFAULT_SAMPLE_RATE = 48000
 DEFAULT_CHANNELS = 2
 DEFAULT_BITS = 16
 
@@ -52,7 +52,7 @@ class WaveWriter(FormatMixin):
         self.format["class"] = class_num
         self.format["bits_per_sample"] = bits_per_sample
 
-        data = bytes(self.format.array)
+        data = bytes(self.format)
         self.riff.write(Chunk(ChunkType.FMT, len(data), data=data))
 
         # Write 'data' chunk header.

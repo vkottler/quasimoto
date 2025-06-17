@@ -2,6 +2,9 @@
 A module implementing enumeration interfaces related to WAVE files.
 """
 
+# built-int
+from typing import Optional
+
 # third-party
 from runtimepy.codec.protocol import Protocol
 from runtimepy.enum.registry import EnumRegistry, RuntimeIntEnum
@@ -15,6 +18,11 @@ class WaveType(RuntimeIntEnum):
 
     PCM = 1
 
+    @classmethod
+    def id(cls) -> Optional[int]:
+        """Override in sub-class to coerce enum id."""
+        return 10
+
 
 WaveType.register_enum(ENUMS)
 
@@ -25,6 +33,11 @@ class WaveClass(RuntimeIntEnum):
     MONO_8 = 1
     STEREO_8 = 2
     STEREO_16 = 4
+
+    @classmethod
+    def id(cls) -> Optional[int]:
+        """Override in sub-class to coerce enum id."""
+        return 11
 
 
 WaveClass.register_enum(ENUMS)
@@ -37,6 +50,11 @@ class WaveShape(RuntimeIntEnum):
     TRIANGLE = 2
     SQUARE = 3
     SAWTOOTH = 4
+
+    @classmethod
+    def id(cls) -> Optional[int]:
+        """Override in sub-class to coerce enum id."""
+        return 12
 
 
 WaveShapelike = WaveShape | int | str

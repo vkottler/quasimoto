@@ -2,11 +2,7 @@
 app:
   - tasks.dev.main
 
-config:
-  midi_name: graham_lofi_C_minor_chords
-
-factories:
-  - {name: tasks.dev.Stereo}
-
-tasks:
-  - {name: stereo, factory: stereo, period_s: 0.01}
+# factories:
+#   - {name: tasks.dev.Stereo}
+# tasks:
+#   - {name: stereo, factory: stereo, period_s: 0.01}

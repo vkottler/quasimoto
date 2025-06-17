@@ -38,7 +38,7 @@ class WaveReader(FormatMixin):
         assert format_chunk.kind is ChunkType.FMT
         assert format_chunk.size == 16
         assert format_chunk.data is not None
-        self.format.array.update(format_chunk.data)
+        self.format.update(format_chunk.data)
 
         # Validate format.
         self.validate_header(self.format)
