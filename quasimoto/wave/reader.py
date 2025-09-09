@@ -29,12 +29,20 @@ class WaveReader(FormatMixin):
 
         assert not riff.is_writer
 
-        # Only expecting 'fmt ' and 'data' chunks.
+        # Only need 'fmt ' and 'data' chunks.
         chunks = list(riff.chunks())
-        assert len(chunks) == 2
+        format_chunk = None
+        for chunk in chunks:
+            if chunk.kind is ChunkType.FMT:
+                assert format_chunk is None
+                format_chunk = chunk
+
+            if chunk.kind is ChunkType.DATA:
+                assert not hasattr(self, "data")
+                self.data: Chunk = chunk
 
         # Parse format.
-        format_chunk: Chunk = chunks[0]
+        assert format_chunk is not None
         assert format_chunk.kind is ChunkType.FMT
         assert format_chunk.size == 16
         assert format_chunk.data is not None
@@ -45,7 +53,6 @@ class WaveReader(FormatMixin):
         self.logger.info("Format header: %s.", self.format)
 
         # Validate data chunk.
-        self.data: Chunk = chunks[1]
         assert self.data.kind is ChunkType.DATA
 
         # Dump some information.

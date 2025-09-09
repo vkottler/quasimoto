@@ -56,7 +56,6 @@ class RiffInterface(LoggerMixin):
 
         result = None
 
-        print(self.stream.tell())
         kind = ChunkType.from_stream(self.stream)
         if kind is not None:
             size = self.read_size()
