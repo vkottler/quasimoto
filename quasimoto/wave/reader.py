@@ -76,6 +76,19 @@ class WaveReader(FormatMixin):
         """Get this data's duration as a human-readable string."""
         return nano_str(int(self.duration_s * 1e9), is_time=True) + "s"
 
+    def chunked_samples(self, count: int) -> Iterator[list[tuple[int, ...]]]:
+        """Iterate over samples in chunks."""
+
+        chunk = []
+        for sample in self.samples:
+            chunk.append(sample)
+            if len(chunk) == count:
+                yield chunk
+                chunk = []
+
+        if chunk:
+            yield chunk
+
     @property
     def samples(self) -> Iterator[tuple[int, ...]]:
         """Get raw samples as a generator."""
