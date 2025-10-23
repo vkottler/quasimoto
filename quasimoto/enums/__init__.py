@@ -29,6 +29,7 @@ class ChunkType(StrEnum):
     FMT = "fmt "
     DATA = "data"
     ID3 = "ID3 "
+    ID3L = "id3 "
 
     @property
     def is_container(self) -> bool:
