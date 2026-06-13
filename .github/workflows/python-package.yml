@@ -21,8 +21,6 @@ jobs:
         python-version:
           - "3.13"
           - "3.14"
-          - "3.11"
-          - "3.12"
         system:
           - ubuntu-latest
           - macos-latest

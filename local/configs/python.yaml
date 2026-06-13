@@ -1,10 +1,4 @@
 ---
-author_info:
-  name: Vaughn Kottler
-  email: vaughnkottler@gmail.com
-  username: vkottler
-versions: ["3.11", "3.12"]
-
 systems:
   - macos-latest
   - windows-latest
