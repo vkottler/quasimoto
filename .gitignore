@@ -15,4 +15,7 @@ coverage*.xml
 tags
 mklocal
 docs
-test.wav
+/*.wav
+/*.png
+src
+quasimoto-out

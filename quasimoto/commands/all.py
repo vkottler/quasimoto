@@ -1,16 +1,12 @@
 # =====================================
 # generator=datazen
-# version=3.1.4
-# hash=b8d2bc2e3ccbd1d7eab451040c2edb8e
+# version=3.2.4
+# hash=749efda4399fce4d27bf9ba7f63ca7a4
 # =====================================
 
 """
 A module aggregating package commands.
 """
-
-# built-in
-from typing import List as _List
-from typing import Tuple as _Tuple
 
 # third-party
 from vcorelib.args import CommandRegister as _CommandRegister
@@ -19,7 +15,7 @@ from vcorelib.args import CommandRegister as _CommandRegister
 from quasimoto.commands.gen import add_gen_cmd
 
 
-def commands() -> _List[_Tuple[str, str, _CommandRegister]]:
+def commands() -> list[tuple[str, str, _CommandRegister]]:
     """Get this package's commands."""
 
     return [

@@ -29,23 +29,30 @@ class WaveReader(FormatMixin):
 
         assert not riff.is_writer
 
-        # Only expecting 'fmt ' and 'data' chunks.
+        # Only need 'fmt ' and 'data' chunks.
         chunks = list(riff.chunks())
-        assert len(chunks) == 2
+        format_chunk = None
+        for chunk in chunks:
+            if chunk.kind is ChunkType.FMT:
+                assert format_chunk is None
+                format_chunk = chunk
+
+            if chunk.kind is ChunkType.DATA:
+                assert not hasattr(self, "data")
+                self.data: Chunk = chunk
 
         # Parse format.
-        format_chunk: Chunk = chunks[0]
+        assert format_chunk is not None
         assert format_chunk.kind is ChunkType.FMT
         assert format_chunk.size == 16
         assert format_chunk.data is not None
-        self.format.array.update(format_chunk.data)
+        self.format.update(format_chunk.data)
 
         # Validate format.
         self.validate_header(self.format)
         self.logger.info("Format header: %s.", self.format)
 
         # Validate data chunk.
-        self.data: Chunk = chunks[1]
         assert self.data.kind is ChunkType.DATA
 
         # Dump some information.
@@ -68,6 +75,19 @@ class WaveReader(FormatMixin):
     def duration_str(self) -> str:
         """Get this data's duration as a human-readable string."""
         return nano_str(int(self.duration_s * 1e9), is_time=True) + "s"
+
+    def chunked_samples(self, count: int) -> Iterator[list[tuple[int, ...]]]:
+        """Iterate over samples in chunks."""
+
+        chunk = []
+        for sample in self.samples:
+            chunk.append(sample)
+            if len(chunk) == count:
+                yield chunk
+                chunk = []
+
+        if chunk:
+            yield chunk
 
     @property
     def samples(self) -> Iterator[tuple[int, ...]]:
@@ -100,5 +120,6 @@ class WaveReader(FormatMixin):
     @contextmanager
     def from_path(path: Path) -> Iterator["WaveReader"]:
         """Get a WAVE reader from a path."""
+
         with RiffInterface.from_path(path, is_writer=False) as riff:
             yield WaveReader(riff)

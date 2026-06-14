@@ -22,16 +22,24 @@ class ChunkType(StrEnum):
     RIFF = "RIFF"
     LIST = "LIST"
     WAVE = "WAVE"
+    INFO = "INFO"
+
+    ISFT = "ISFT"
 
     FMT = "fmt "
     DATA = "data"
     ID3 = "ID3 "
+    ID3L = "id3 "
 
     @property
     def is_container(self) -> bool:
         """Whether or not this is a container chunk type."""
 
-        return self is ChunkType.RIFF or self is ChunkType.LIST
+        return (
+            self is ChunkType.RIFF
+            or self is ChunkType.LIST
+            or self is ChunkType.INFO
+        )
 
     @staticmethod
     def from_stream(stream: BinaryIO) -> Optional["ChunkType"]:

@@ -1,7 +1,7 @@
 # =====================================
 # generator=datazen
-# version=3.1.4
-# hash=372222f3f6b266691437ff06877b630c
+# version=3.2.4
+# hash=3538e0b7fa49298836a10350f8149749
 # =====================================
 
 """
@@ -18,9 +18,9 @@ except (ImportError, ModuleNotFoundError):
 from quasimoto import DESCRIPTION, PKG_NAME, VERSION
 
 author_info = {
-    "name": "Vaughn Kottler",
-    "email": "vaughnkottler@gmail.com",
-    "username": "vkottler",
+    "name": "Libre Embedded",
+    "email": "vaughn@libre-embedded.com",
+    "username": "libre-embedded",
 }
 pkg_info = {
     "name": PKG_NAME,
@@ -28,8 +28,8 @@ pkg_info = {
     "version": VERSION,
     "description": DESCRIPTION,
     "versions": [
-        "3.11",
-        "3.12",
+        "3.13",
+        "3.14",
     ],
 }
 setup(

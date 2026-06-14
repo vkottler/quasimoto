@@ -56,7 +56,6 @@ class RiffInterface(LoggerMixin):
 
         result = None
 
-        print(self.stream.tell())
         kind = ChunkType.from_stream(self.stream)
         if kind is not None:
             size = self.read_size()
@@ -148,5 +147,7 @@ class RiffInterface(LoggerMixin):
 
         with path.open("wb" if is_writer else "rb") as out_fd:
             result = cls(out_fd, is_writer=is_writer)
-            yield result
-            result.finalize()
+            try:
+                yield result
+            finally:
+                result.finalize()

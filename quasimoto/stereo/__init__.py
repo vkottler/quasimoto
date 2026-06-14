@@ -1,8 +1,9 @@
 """
-A module implementing some stereo-audio interfaces.
+A module implementing a simple stereo signal interface.
 """
 
 # built-in
+from copy import copy
 from io import BytesIO
 from queue import SimpleQueue
 
@@ -10,7 +11,8 @@ from queue import SimpleQueue
 import pyaudio
 
 # internal
-from quasimoto.sampler import Sampler
+from quasimoto.sampler.channel import SignalChannel
+from quasimoto.sampler.time import TimeKeeper
 from quasimoto.wave import WaveWriter
 
 
@@ -22,18 +24,30 @@ class StereoInterface:
     def __init__(self) -> None:
         """Initialize this instance."""
 
-        self.left = Sampler()
-        self.right = self.left.copy(harmonic=-1)
+        self.time = TimeKeeper()
+        self.left = SignalChannel(self.time)
+        self.right = copy(self.left)
 
         self.sample_queue: SimpleQueue[tuple[int, int]] = SimpleQueue()
+
+        self.left_raw: list[int] = []
+        self.right_raw: list[int] = []
+
+    def next(self) -> tuple[int, int]:
+        """Get the next pair of samples."""
+
+        left = next(self.left)
+        right = next(self.right)
+        self.time.advance()
+        return left, right
 
     def buffer_to_duration(self, duration_s: float) -> None:
         """Fill sample-queue buffer to the specified duration."""
 
         for _ in range(
-            int(duration_s * self.left.sample_rate) - self.sample_queue.qsize()
+            int(duration_s * self.time.sample_rate) - self.sample_queue.qsize()
         ):
-            self.sample_queue.put_nowait((next(self.left), next(self.right)))
+            self.sample_queue.put_nowait(self.next())
 
     def frames(self, frame_count: int) -> bytes:
         """Get sample frames in a single chunk of bytes."""
@@ -42,15 +56,22 @@ class StereoInterface:
             # Get pre-computed samples from queue.
             from_queue = min(self.sample_queue.qsize(), frame_count)
             for _ in range(from_queue):
-                left_sample, right_sample = self.sample_queue.get_nowait()
-                WaveWriter.to_stream(stream, left_sample)
-                WaveWriter.to_stream(stream, right_sample)
+                left, right = self.sample_queue.get_nowait()
+                WaveWriter.to_stream(stream, left)
+                WaveWriter.to_stream(stream, right)
+
+                self.left_raw.append(left)
+                self.right_raw.append(right)
 
             # Get new samples if necessary.
             frame_count -= from_queue
             for _ in range(frame_count):
-                WaveWriter.to_stream(stream, next(self.left))
-                WaveWriter.to_stream(stream, next(self.right))
+                left, right = self.next()
+                WaveWriter.to_stream(stream, left)
+                WaveWriter.to_stream(stream, right)
+
+                self.left_raw.append(left)
+                self.right_raw.append(right)
 
             return stream.getvalue()
 

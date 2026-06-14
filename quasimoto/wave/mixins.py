@@ -16,7 +16,7 @@ from quasimoto.wave.protocol import WaveFormat
 class FormatMixin(LoggerMixin):
     """A class mixin for classes that use wave format data."""
 
-    byte_order = WaveFormat.protocol.array.byte_order
+    byte_order = WaveFormat.protocol.byte_order
 
     def __init__(self) -> None:
         """Initialize this instance."""

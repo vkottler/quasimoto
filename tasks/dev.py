@@ -6,16 +6,29 @@ A module implementing developmental runtimepy interfaces.
 import asyncio
 from contextlib import contextmanager
 import math
-from typing import Iterator
+from pathlib import Path
+from typing import Iterator, Optional
 
 # third-party
+import matplotlib.pyplot as plt
+import mido
 import pyaudio
 from runtimepy.net.arbiter import AppInfo
 from runtimepy.net.arbiter.task import ArbiterTask, TaskFactory
 from runtimepy.primitives import Double
 
 # internal
-from tasks.stereo import StereoInterface
+from quasimoto import PKG_NAME
+from quasimoto.enums.wave import WaveShape
+from quasimoto.sampler import Sampler
+from quasimoto.sampler.channel import SignalChannel
+from quasimoto.sampler.notes import Note
+from quasimoto.sampler.parameters import SourceParameters
+from quasimoto.sampler.signature import beat_period
+from quasimoto.sampler.source import SourceInterface
+from quasimoto.sampler.time import TimeCallback, TimeKeeper
+from quasimoto.stereo import StereoInterface
+from quasimoto.wave.writer import WaveWriter
 
 
 @contextmanager
@@ -35,30 +48,40 @@ class StereoTask(ArbiterTask):
     auto_finalize = True
 
     audio: pyaudio.PyAudio
-    stream: pyaudio.Stream
+    stream: Optional[pyaudio.Stream]
+
+    def register_source_state(
+        self, name: str, source: SourceInterface, commandable: bool = True
+    ) -> None:
+        """Register state for a source instance."""
+
+        self.env.channel(
+            f"{name}.frequency", source.frequency, commandable=commandable
+        )
+        self.env.channel(
+            f"{name}.amplitude", source.amplitude, commandable=commandable
+        )
+        self.env.channel(
+            f"{name}.shape", source.shape, commandable=True, enum="WaveShape"
+        )
+        self.env.channel(f"{name}.enabled", source.enabled)
 
     def _init_state(self) -> None:
         """Add channels to this instance's channel environment."""
 
-        # Add channels from this here.
+        WaveShape.register_enum(self.env.enums)
+
         self.stereo = StereoInterface()
-
-        sampler = self.stereo.left
-        self.env.channel("left.frequency", sampler.frequency, commandable=True)
-        self.env.channel("left.amplitude", sampler.amplitude, commandable=True)
-
-        sampler = self.stereo.right
-        self.env.channel(
-            "right.frequency", sampler.frequency, commandable=True
-        )
-        self.env.channel(
-            "right.amplitude", sampler.amplitude, commandable=True
-        )
+        # register state from stereo / individual left and right channels
 
         self.buffer_depth_scalar = Double(value=10.0)
         self.env.channel(
             "buffer_depth_scalar", self.buffer_depth_scalar, commandable=True
         )
+
+        # Set this to true when audio should start.
+        self.start = False
+        self.stream = None
 
     @staticmethod
     @contextmanager
@@ -67,14 +90,17 @@ class StereoTask(ArbiterTask):
     ) -> Iterator[pyaudio.Stream]:
         """Get a pyaudio stream."""
 
+        # remove at some point
+        num_bits = 16
+
+        stream = audio.open(
+            format=audio.get_format_from_width(num_bits // 8),
+            channels=stereo.num_channels,
+            rate=stereo.time.sample_rate,
+            stream_callback=stereo.callback,
+            output=True,
+        )
         try:
-            stream = audio.open(
-                format=audio.get_format_from_width(stereo.left.num_bits // 8),
-                channels=stereo.num_channels,
-                rate=stereo.left.sample_rate,
-                stream_callback=stereo.callback,
-                output=True,
-            )
             yield stream
         finally:
             stream.close()
@@ -83,22 +109,28 @@ class StereoTask(ArbiterTask):
         """Initialize this task with application information."""
 
         await super().init(app)
-
         self.audio = app.stack.enter_context(get_pyaudio())
-
-        self.stream = app.stack.enter_context(
-            StereoTask.get_stream(self.audio, self.stereo)
-        )
 
     async def dispatch(self) -> bool:
         """Dispatch an iteration of this task."""
 
-        result: bool = self.stream.is_active()
-        if result:
-            # Populate 10x our period
-            self.stereo.buffer_to_duration(
-                self.period_s.value * self.buffer_depth_scalar.value
+        # Initialize when ready.
+        if self.start and self.stream is None:
+            self.stream = self.app.stack.enter_context(
+                StereoTask.get_stream(self.audio, self.stereo)
             )
+
+        result = True
+
+        if self.stream is not None:
+            result = self.stream.is_active()
+            if result:
+                # This is kind of doing nothing.
+                # Populate 10x our period
+                # self.stereo.buffer_to_duration(
+                #     self.period_s.value * self.buffer_depth_scalar.value
+                # )
+                pass
 
         return result
 
@@ -109,24 +141,254 @@ class Stereo(TaskFactory[StereoTask]):
     kind = StereoTask
 
 
+def create_plots() -> None:
+    """A method for creating some waveform plots."""
+
+    sampler = Sampler(TimeKeeper())
+    sampler.plot("out.png", 0.01)
+
+
+def increment_wave_shapes(stereo: StereoInterface, step: int) -> None:
+    """Increment wave shapes for current stereo sources."""
+
+    # Change the wave shapes.
+    if step % 100 == 0:
+        for source in stereo.left.sources.values():
+            if isinstance(source, Sampler):
+                source.next_shape()
+        for source in stereo.right.sources.values():
+            if isinstance(source, Sampler):
+                source.next_shape()
+
+
+def sinusoidal_amplitude(stereo: StereoInterface, freq: float = 0.5) -> None:
+    """Modify amplitude sinusoidally over time."""
+
+    raw = (
+        math.sin(math.tau * asyncio.get_running_loop().time() * freq) + 1.0
+    ) / 2.0
+    flipped = 1 - raw
+
+    # Re-assign
+    for source in stereo.left.sources.values():
+        source.amplitude.value = raw
+    for source in stereo.right.sources.values():
+        source.amplitude.value = flipped
+
+
+def channel_note(
+    channel: SignalChannel, index: int, **kwargs
+) -> SourceInterface:
+    """Get the note source for a channel given a note's index."""
+
+    note, offset = Note.from_index(index)
+    name = f"{note.name}{offset}"
+
+    # Register source if necessary.
+    if name not in channel.sources:
+        # Create source for note.
+        new_source = Sampler(
+            channel.time_keeper,
+            params=SourceParameters.from_note(
+                note, octave_offset=offset, **kwargs
+            ),
+        )
+
+        # Disable by default.
+        new_source.enabled.value = False
+
+        assert channel.register_source(name, new_source)
+
+    return channel.sources[name]
+
+
+def handle_note_state(
+    stereo: StereoInterface, curr_time: float, msg, **kwargs
+) -> None:
+    """Handle registering a note-state event."""
+
+    for channel in (stereo.left, stereo.right):
+        source = channel_note(channel, msg.note, **kwargs)
+
+        is_on = "on" in msg.type
+
+        event_time = curr_time + msg.time
+
+        # Handle ending on a zero point, extend to the nearest phase start.
+        # if not is_on:
+        #     event_time = source.quantize_to_period(event_time)
+
+        # stereo.time.call_at(source.quantize_to_period(event_time), handler)
+
+        # Register event.
+        stereo.time.call_at(
+            event_time, source.enable_event if is_on else source.disable_event
+        )
+
+
+def process_midi_file(path: Path, stereo: StereoInterface, **kwargs) -> float:
+    """Return duration."""
+
+    curr_time = stereo.time.time
+    last_note_time = curr_time
+
+    for msg in mido.MidiFile(path):
+        # Handle control messages.
+        if msg.is_cc():
+            print(msg.type)
+
+        # Handle meta messages.
+        elif msg.is_meta:
+            print(msg.type)
+
+        # Handle turning notes on and off.
+        elif msg.type.startswith("note"):
+            handle_note_state(stereo, curr_time, msg, **kwargs)
+            last_note_time = curr_time
+
+        # Print messages not handled.
+        else:
+            print(msg.type)
+
+        curr_time += msg.time
+
+    return last_note_time - stereo.time.time
+
+
+def audio_synth(app: AppInfo, midi_name: str, shape: WaveShape) -> None:
+    """Write audio from midi."""
+
+    # Not necessary to use task when not doing live audio.
+    # stereo = list(app.search_tasks(kind=StereoTask))[0].stereo
+    stereo = StereoInterface()
+
+    path = Path(__file__).parent.joinpath("data", f"{midi_name}.mid")
+
+    with app.log_time("Processing '%s'", path, reminder=True):
+        duration = process_midi_file(path, stereo, shape=shape)
+
+    # Allow signal to decay to zero.
+    duration += 0.1
+
+    # stereo.left.plot(Path("test.png"), 10.0)
+    # stereo.left.to_wave(Path("test.wav"), 10.0)
+
+    # Signal that task should start.
+    # stereo_task.start = True
+
+    # while not app.stop.is_set():
+    #    await asyncio.sleep(1.0)
+
+    # await asyncio.sleep(20.0)
+
+    num_frames = int(duration / stereo.time.period)
+    with app.log_time(
+        "Rendering %d sample frames (%fs @ %d Hz)",
+        num_frames,
+        duration,
+        stereo.time.sample_rate,
+        reminder=True,
+    ):
+        stereo.frames(num_frames)
+
+    output = Path(f"{PKG_NAME}-out")
+    output.mkdir(exist_ok=True)
+
+    path = output.joinpath(f"{midi_name}-{shape.name.lower()}.wav")
+    with WaveWriter.from_path(path) as writer:
+        samples = []
+        for left, right in zip(stereo.left_raw, stereo.right_raw):
+            samples.append((left, right))
+
+        with app.log_time("Writing '%s'", path, reminder=True):
+            writer.write(samples)
+
+    path = output.joinpath(f"{midi_name}-{shape.name.lower()}.png")
+    with app.log_time("Rendering '%s'", path, reminder=True):
+        plt.plot(stereo.left_raw)
+        plt.savefig(path, bbox_inches="tight")
+
+    # create_plots()
+
+
 async def main(app: AppInfo) -> int:
     """Waits for the stop signal to be set."""
 
-    stereo = list(app.search_tasks(kind=StereoTask))[0].stereo
+    # Should refactor to multi-process pool to generate all in parallel.
+    for midi_name in [
+        "C_minor_G7_transition",
+        "graham_lofi_Bb_minor_arpeggios",
+        "graham_lofi_Bb_minor_chords",
+        "graham_lofi_C_minor_arpeggios",
+        "graham_lofi_C_minor_chords",
+    ]:
+        for shape in ["sine", "triangle", "square", "sawtooth"]:
+            audio_synth(app, midi_name, WaveShape.normalize(shape))
 
-    freq = 0.5
-    loop = asyncio.get_running_loop()
+    return 0
 
-    # Alter the frequencies.
+
+async def dev(app: AppInfo) -> int:
+    """Waits for the stop signal to be set."""
+
+    stereo_task = list(app.search_tasks(kind=StereoTask))[0]
+    stereo = stereo_task.stereo
+
+    # register factories
+    assert stereo.left.register_factory(Sampler)
+
+    quarter = beat_period()
+
+    source_idx = 0
+
+    def play_note(
+        duration: float, *notes: Note, octave: int = 0
+    ) -> TimeCallback:
+        """Create a routine that plays a simple note."""
+
+        def routine(now: float) -> None:
+            """Register the note source."""
+
+            del now
+
+            nonlocal source_idx
+
+            for note in notes:
+                for chan in (stereo.left, stereo.right):
+                    chan.register_dynamic(
+                        str(source_idx),
+                        "sampler",
+                        {
+                            "duration": duration,
+                            "frequency": note.frequency(octave),
+                        },
+                    )
+                    source_idx += 1
+
+        return routine
+
+    stereo.time.call_sequence(
+        (quarter, play_note(quarter, Note.C)),
+        (quarter, play_note(quarter, Note.C, Note.E, Note.G)),
+        (quarter, play_note(quarter, Note.D)),
+        (quarter, play_note(quarter, Note.D, Note.F, Note.A)),
+        (quarter, play_note(quarter, Note.E)),
+        (quarter, play_note(quarter, Note.E, Note.G, Note.B)),
+        (quarter, play_note(quarter, Note.F)),
+        (quarter, play_note(quarter, Note.G)),
+        (quarter, play_note(quarter, Note.A)),
+        (quarter, play_note(quarter, Note.B)),
+        (quarter, play_note(quarter, Note.C, octave=1)),
+        (quarter, play_note(quarter, Note.B)),
+        (quarter, play_note(quarter, Note.A)),
+        (quarter, play_note(quarter, Note.G)),
+        (quarter, play_note(quarter, Note.F)),
+        (quarter, play_note(quarter, Note.E)),
+        (quarter, play_note(quarter, Note.D)),
+        (quarter, play_note(quarter * 4.0, Note.C)),
+    )
+
     while not app.stop.is_set():
-        # Conform to 0-1 domain.
-        raw = (math.sin(math.tau * loop.time() * freq) + 1.0) / 2.0
-
-        # Re-assign
-        stereo.left.amplitude.value = raw
-        stereo.right.amplitude.value = 1 - raw
-
-        # Run periodically.
-        await asyncio.sleep(0.01)
+        await asyncio.sleep(1.0)
 
     return 0
