@@ -26,6 +26,11 @@ class ChunkType(StrEnum):
 
     ISFT = "ISFT"
     INAM = "INAM"
+    IPRD = "IPRD"
+    IART = "IART"
+    ICMT = "ICMT"
+    ICRD = "ICRD"
+    IGNR = "IGNR"
 
     FMT = "fmt "
     DATA = "data"
