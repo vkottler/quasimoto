@@ -3,10 +3,11 @@ A module implementing interfaces for reading WAVE files.
 """
 
 # built-in
+from collections.abc import Iterator
 from contextlib import contextmanager
 from io import BytesIO
 from pathlib import Path
-from typing import Iterator, cast
+from typing import cast
 
 # third-party
 from runtimepy.primitives import Int16

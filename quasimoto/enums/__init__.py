@@ -25,6 +25,12 @@ class ChunkType(StrEnum):
     INFO = "INFO"
 
     ISFT = "ISFT"
+    INAM = "INAM"
+    IPRD = "IPRD"
+    IART = "IART"
+    ICMT = "ICMT"
+    ICRD = "ICRD"
+    IGNR = "IGNR"
 
     FMT = "fmt "
     DATA = "data"
@@ -48,10 +54,9 @@ class ChunkType(StrEnum):
         result = None
 
         check = stream.read(3).decode("ascii")
-        if len(check) == 3:
+        if len(check) == 3 and check != "ID3":
             # Some files hackily have some 'ID3' metadata at the end?
-            if check != "ID3":
-                result = ChunkType(check + stream.read(1).decode("ascii"))
+            result = ChunkType(check + stream.read(1).decode("ascii"))
 
         return result
 
