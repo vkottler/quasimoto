@@ -2,11 +2,11 @@
     =====================================
     generator=datazen
     version=3.2.4
-    hash=a8b10f4623912f67d7186580098a37b6
+    hash=a28f90f9633027bf9f573b6027e9423e
     =====================================
 -->
 
-# quasimoto ([0.2.2](https://pypi.org/project/quasimoto/))
+# quasimoto ([0.2.3](https://pypi.org/project/quasimoto/))
 
 [![python](https://img.shields.io/pypi/pyversions/quasimoto.svg)](https://pypi.org/project/quasimoto/)
 ![Build Status](https://github.com/libre-embedded/quasimoto/workflows/Python%20Package/badge.svg)
